@@ -1,0 +1,41 @@
+name: Archive-sync forks with upstream
+
+# Keeps every fork in the org archived from its upstream: branches and tags.
+# Nothing already archived is ever lost; see scripts/sync-refs.sh.
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"   # every 6 hours (UTC); GitHub may delay scheduled runs a bit
+  workflow_dispatch:         # allow manual runs from the Actions tab
+    inputs:
+      dry_run:
+        description: "Only report what would be copied"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read    # checkout of this repo
+  actions: write    # keepalive (re-enable this workflow so GitHub never auto-disables it)
+
+concurrency:
+  group: sync-forks
+  cancel-in-progress: false
+
+env:
+  GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
+  ORG: NecroArchive
+  DRY_RUN: ${{ inputs.dry_run || false }}
+
+jobs:
+  refs:
+    name: Branches & tags
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Keep scheduled workflow alive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/sync-forks.yml/enable"
+      - name: Sync branches and tags
+        run: bash scripts/sync-refs.sh
